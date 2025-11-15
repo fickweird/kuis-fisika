@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kuis Fisika SMK 3D</title>
+  <!-- Three.js -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <style>
+    :root {
+      --bg:#0b0f1a; --panel:#0c1121; --text:#e9eefc; --muted:#9fb3d9;
+      --accent:#5cc8ff; --accent2:#ff7a59; --good:#32d28f; --bad:#ff5c7a;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+    #app{display:grid;grid-template-columns:1fr 420px;height:100vh}
+    #scene{position:relative;overflow:hidden;background:radial-gradient(1200px 800px at 60% 40%, #0e1628 0%, #0b0f1a 70%)}
+    #panel{background:var(--panel);border-left:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;padding:20px;gap:12px}
+    h1{margin:0 0 8px;font-size:20px}
+    .subtitle{color:var(--muted);font-size:13px;margin-bottom:8px}
+    .card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px}
+    .hud{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+    .pill{background:#15233f;border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    .question{font-size:16px}
+    .options{display:grid;gap:8px;margin-top:12px}
+    .btn{background:#172038;border:1px solid rgba(92,200,255,0.25);color:var(--text);padding:10px;border-radius:12px;cursor:pointer;text-align:left}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.correct{background:rgba(50,210,143,0.18);border-color:rgba(50,210,143,0.6)}
+    .btn.wrong{background:rgba(255,92,122,0.18);border-color:rgba(255,92,122,0.6)}
+    .controls{display:flex;gap:10px;margin-top:12px;align-items:center}
+    .cta{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#0b0f1a;font-weight:800;border:none;padding:10px 14px;border-radius:12px;cursor:pointer}
+    .cta.secondary{background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.12)}
+    .explain{color:var(--muted);font-size:13px;margin-top:8px;min-height:20px}
+    .result{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+    .stat{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px}
+    .stat .k{color:var(--muted);font-size:12px}
+    .stat .v{font-weight:800;font-size:18px}
+    .credit{margin-top:auto;text-align:center;padding:12px;font-size:13px;color:var(--muted);border-top:1px solid rgba(255,255,255,0.1);letter-spacing:0.6px}
+    @media(max-width:920px){#app{grid-template-columns:1fr}#panel{border-left:none;border-top:1px solid rgba(255,255,255,0.08)}}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="scene"><canvas id="canvas"></canvas></div>
+    <div id="panel">
+      <h1>Kuis Fisika SMK • 3D</h1>
+      <div class="subtitle">25 soal. Skor +10 benar, −5 salah. Selamat main!</div>
+
+      <div class="card">
+        <div class="hud">
+          <span class="pill">Skor: <strong id="score">0</strong></span>
+          <span class="pill">Soal: <strong id="progress">0/25</strong></span>
+          <span class="pill">Akurasi: <strong id="accuracy">0%</strong></span>
+        </div>
+
+        <div class="question" id="question">Klik “Mulai Kuis” untuk memulai.</div>
+        <div class="options" id="options"></div>
+
+        <div class="controls">
+          <button class="cta" id="startBtn">Mulai Kuis</button>
+          <button class="cta secondary" id="resetBtn">Ulang</button>
+        </div>
+
+        <div class="explain" id="explain"></div>
+
+        <div class="result" id="result">
+          <div class="stat"><div class="k">Benar</div><div class="v" id="correctCount">0</div></div>
+          <div class="stat"><div class="k">Salah</div><div class="v" id="wrongCount">0</div></div>
+          <div class="stat"><div class="k">Skor akhir</div><div class="v" id="finalScore">0</div></div>
+          <div class="stat"><div class="k">Akurasi</div><div class="v" id="finalAcc">0%</div></div>
+          <button class="cta" id="restartBtn">Main Lagi</button>
+        </div>
+      </div>
+
+      <div class="credit">Made by Fikri</div>
+    </div>
+  </div>
+
+  <script>
+    // ====== Bank Soal (25) ======
+    const QUESTIONS = [
+      {q:"Mobil menempuh 60 km dalam 1.5 jam. Kecepatan rata-rata?", options:["30 km/jam","40 km/jam","45 km/jam","60 km/jam"], answer:1, explain:"v = s/t = 60/1.5 = 40 km/jam."},
+      {q:"Massa 2 kg, percepatan 3 m/s². Berapa gaya?", options:["3 N","5 N","6 N","9 N"], answer:2, explain:"F = m·a = 2×3 = 6 N."},
+      {q:"Daya 100 W digunakan 30 s. Energi yang dipakai?", options:["300 J","3000 J","30 J","3 J"], answer:1, explain:"E = P·t = 100×30 = 3000 J."},
+      {q:"Hambatan 10 Ω dialiri arus 2 A. Tegangan?", options:["5 V","10 V","20 V","200 V"], answer:2, explain:"V = I·R = 2×10 = 20 V."},
+      {q:"Frekuensi 50 Hz, panjang gelombang 2 m. Cepat rambat?", options:["50 m/s","100 m/s","75 m/s","25 m/s"], answer:1, explain:"v = f·λ = 50×2 = 100 m/s."},
+      {q:"36 km/jam ke m/s adalah ...", options:["10 m/s","8 m/s","12 m/s","15 m/s"], answer:0, explain:"36×(1000/3600) = 10 m/s."},
+      {q:"m=0.5 kg, v=8 m/s. Momentum p?", options:["2 kg·m/s","3 kg·m/s","4 kg·m/s","8 kg·m/s"], answer:2, explain:"p = m·v = 0.5×8 = 4 kg·m/s."},
+      {q:"Gaya 50 N memindahkan benda 3 m searah gaya. Usaha?", options:["50 J","100 J","150 J","200 J"], answer:2, explain:"W = F·s = 50×3 = 150 J."},
+      {q:"Sumber 12 V dengan arus 0.5 A. Daya?", options:["3 W","6 W","12 W","24 W"], answer:1, explain:"P = V·I = 12×0.5 = 6 W."},
+      {q:"Periode T = 0.02 s. Frekuensi?", options:["20 Hz","40 Hz","50 Hz","60 Hz"], answer:2, explain:"f = 1/T = 1/0.02 = 50 Hz."},
+      {q:"m=1 kg, v=10 m/s. Energi kinetik?", options:["10 J","20 J","50 J","100 J"], answer:2, explain:"E_k = 1/2 m v^2 = 1/2 × 1 × 100 = 50 J."},
+      {q:"m=2 kg, h=5 m (g≈10). Energi potensial?", options:["10 J","20 J","50 J","100 J"], answer:3, explain:"E_p = mgh = 2×10×5 = 100 J."},
+      {q:"Arus 3 A mengalir 10 s. Muatan listrik Q?", options:["30 C","3 C","300 C","0.3 C"], answer:0, explain:"Q = I·t = 3×10 = 30 C."},
+      {q:"c ≈ 3×10^8 m/s, λ = 600 nm. Frekuensi cahaya?", options:["5×10^14 Hz","6×10^14 Hz","7×10^14 Hz","8×10^14 Hz"], answer:1, explain:"f = c/λ ≈ 3e8 / 6e-7 = 5×10^14 s^-1 (≈5–6e14)."},
+      {q:"Lensa konvergen f = 20 cm, benda sangat jauh. Bayangan terbentuk ...", options:["di fokus (20 cm)","tak berhingga","40 cm","di depan lensa"], answer:0, explain:"Untuk benda di ∞, bayangan di fokus pada jarak f."},
+      {q:"Rangkaian seri 2 Ω dan 3 Ω. Hambatan total?", options:["5 Ω","6 Ω","2.5 Ω","1 Ω"], answer:0, explain:"R_total = 2 + 3 = 5 Ω."},
+      {q:"Paralel 6 Ω dan 3 Ω. Hambatan total?", options:["2 Ω","3 Ω","4 Ω","9 Ω"], answer:0, explain:"1/R = 1/6 + 1/3 = 1/2 ⇒ R = 2 Ω."},
+      {q:"v suara ≈ 340 m/s, f = 170 Hz. Panjang gelombang?", options:["1 m","2 m","3 m","4 m"], answer:1, explain:"λ = v/f = 340/170 = 2 m."},
+      {q:"Arus 1 A selama 60 s. Muatan?", options:["30 C","60 C","600 C","1 C"], answer:1, explain:"Q = I·t = 1×60 = 60 C."},
+      {q:"m=4 kg, a=2.5 m/s². Gaya?", options:["5 N","8 N","10 N","12 N"], answer:2, explain:"F = m·a = 4×2.5 = 10 N."},
+      {q:"P=200 W, t=5 s. Energi?", options:["1000 J","200 J","20 J","500 J"], answer:0, explain:"E = P·t = 200×5 = 1000 J."},
+      {q:"m=0.2 kg, v=15 m/s. Momentum?", options:["3 kg·m/s","2 kg·m/s","4 kg·m/s","5 kg·m/s"], answer:0, explain:"p = 0.2×15 = 3 kg·m/s."},
+      {q:"R=4 Ω, I=2 A. Tegangan?", options:["2 V","4 V","6 V","8 V"], answer:3, explain:"V = I·R = 2×4 = 8 V."},
+      {q:"f=25 Hz, λ=4 m. Cepat rambat?", options:["50 m/s","100 m/s","75 m/s","25 m/s"], answer:1, explain:"v = f·λ = 25×4 = 100 m/s."},
+      {q:"m=5 kg, h=2 m (g≈10). Energi potensial?", options:["5 J","10 J","50 J","100 J"], answer:3, explain:"E_p = 5×10×2 = 100 J."}
+    ];
+
+    // ====== State & Elemen ======
+    let idx = 0;
+    let score = 0;
+    let correct = 0;
+    let wrong = 0;
+
+    const els = {
+      question: document.getElementById("question"),
+      options: document.getElementById("options"),
+      explain: document.getElementById("explain"),
+      startBtn: document.getElementById("startBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      restartBtn: document.getElementById("restartBtn"),
+      result: document.getElementById("result"),
+      score: document.getElementById("score"),
+      progress: document.getElementById("progress"),
+      accuracy: document.getElementById("accuracy"),
+      correctCount: document.getElementById("correctCount"),
+      wrongCount: document.getElementById("wrongCount"),
+      finalScore: document.getElementById("finalScore"),
+      finalAcc: document.getElementById("finalAcc"),
+    };
+
+    function updateHUD() {
+      els.score.textContent = score;
+      els.progress.textContent = `${Math.min(idx, QUESTIONS.length)}/${QUESTIONS.length}`;
+      const total = correct + wrong;
+      els.accuracy.textContent = total ? Math.round((correct / total) * 100) + "%" : "0%";
+    }
+
+    function renderQuestion() {
+      if (idx >= QUESTIONS.length) {
+        finishQuiz();
+        return;
+      }
+      const q = QUESTIONS[idx];
+      els.question.textContent = q.q;
+      els.options.innerHTML = "";
+      els.explain.textContent = "";
+
+      q.options.forEach((opt, i) => {
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.textContent = opt;
+        b.onclick = () => {
+          // Disable semua tombol agar tidak double click
+          Array.from(els.options.children).forEach(x => x.disabled = true);
+
+          // Cek jawaban
+          if (i === q.answer) {
+            b.classList.add("correct");
+            score += 10;
+            correct++;
+            els.explain.textContent = "Benar! " + q.explain;
+            pulseScene("good");
+          } else {
+            b.classList.add("wrong");
+            score -= 5;
+            wrong++;
+            els.explain.textContent = "Kurang tepat. " + q.explain;
+            pulseScene("bad");
+            // tandai jawaban benar
+            Array.from(els.options.children).forEach(x => {
+              if (x.textContent === q.options[q.answer]) x.classList.add("correct");
+            });
+          }
+          updateHUD();
+          setTimeout(() => { idx++; renderQuestion(); }, 900);
+        };
+        els.options.appendChild(b);
+      });
+
+      updateHUD();
+    }
+
+    function finishQuiz() {
+      els.question.textContent = "Ringkasan hasil:";
+      els.options.innerHTML = "";
+      els.explain.textContent = "Keren! Kamu sudah menyelesaikan 25 soal.";
+      els.result.style.display = "grid";
+      els.correctCount.textContent = correct;
+      els.wrongCount.textContent = wrong;
+      els.finalScore.textContent = score;
+      const total = correct + wrong;
+      els.finalAcc.textContent = total ? Math.round((correct / total) * 100) + "%" : "0%";
+    }
+
+    function resetQuiz(full = true) {
+      idx = 0; score = 0; correct = 0; wrong = 0;
+      els.result.style.display = "none";
+      els.explain.textContent = "";
+      if (full) {
+        els.question.textContent = "Klik “Mulai Kuis” untuk memulai.";
+        els.options.innerHTML = "";
+      } else {
+        renderQuestion();
+      }
+      updateHUD();
+    }
+
+    // Hook tombol
+    els.startBtn.addEventListener("click", () => { resetQuiz(false); renderQuestion(); });
+    els.resetBtn.addEventListener("click", () => { resetQuiz(true); });
+    els.restartBtn.addEventListener("click", () => { resetQuiz(false); renderQuestion(); });
+
+    // Inisialisasi HUD
+    updateHUD();
+
+    // ====== Visual 3D ======
+    const canvas = document.getElementById("canvas");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
+    camera.position.set(0, 1.2, 5);
+
+    const ambient = new THREE.AmbientLight(0x9fb3d9, 0.35);
+    scene.add(ambient);
+    const dir = new THREE.DirectionalLight(0x5cc8ff, 1.0);
+    dir.position.set(3, 4, 2);
+    scene.add(dir);
+
+    const grid = new THREE.GridHelper(20, 20, 0x2a3146, 0x1f2740);
+    grid.position.y = -1.2; scene.add(grid);
+
+    const matA = new THREE.MeshStandardMaterial({ color: 0x5cc8ff, metalness: 0.6, roughness: 0.3 });
+    const matB = new THREE.MeshStandardMaterial({ color: 0xff7a59, metalness: 0.4, roughness: 0.4 });
+    const matC = new THREE.MeshStandardMaterial({ color: 0x32d28f, metalness: 0.5, roughness: 0.5 });
+
+    const torus = new THREE.Mesh(new THREE.TorusKnotGeometry(0.7, 0.22, 220, 32), matA);
+    torus.position.set(-1.2, 0.3, 0);
+    const ico = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), matB);
+    ico.position.set(1.1, 0.2, 0.3);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), matC);
+    box.position.set(0, -0.1, -0.8);
+    scene.add(torus, ico, box);
+
+    // Partikel
+    const particleCount = 240;
+    const pPositions = new Float32Array(particleCount * 3);
+    for (let i=0;i<particleCount;i++){
+      pPositions[i*3+0] = (Math.random()-0.5) * 12;
+      pPositions[i*3+1] = Math.random() * 4 - 1.2;
+      pPositions[i*3+2] = (Math.random()-0.5) * 8;
+    }
+    const pGeo = new THREE.BufferGeometry();
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+    const pMat = new THREE.PointsMaterial({ color: 0x9fb3d9, size: 0.03 });
+    const points = new THREE.Points(pGeo, pMat);
+    scene.add(points);
+
+    const sceneEl = document.getElementById("scene");
+    function onResize() {
+      const rect = sceneEl.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', onResize);
+    onResize();
+
+    let mouseX = 0, mouseY = 0;
+    sceneEl.addEventListener('mousemove', (e) => {
+      const rect = sceneEl.getBoundingClientRect();
+      mouseX = (e.clientX - rect.left - rect.width/2) / rect.width;
+      mouseY = (e.clientY - rect.top - rect.height/2) / rect.height;
+    });
+
+    function pulseScene(kind) {
+      const target = (kind === "good") ? 1.35 : 0.75;
+      const orig = dir.intensity;
+      let t = 0;
+      const duration = 300;
+      const id = setInterval(() => {
+        t += 16;
+        const k = Math.min(1, t/duration);
+        dir.intensity = orig + (target - orig) * (1 - Math.cos(Math.PI*k)) * 0.5;
+        if (k >= 1) { dir.intensity = orig; clearInterval(id); }
+      }, 16);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = performance.now() * 0.001;
+      torus.rotation.x = t * 0.4;
+      torus.rotation.y = t * 0.22;
+      ico.rotation.y = t * 0.3;
+      box.rotation.x = t * 0.2;
+      box.rotation.y = t * 0.15;
+
+      camera.position.x = mouseX * 1.2;
+      camera.position.y = 1.2 + mouseY * 0.6;
+      camera.lookAt(0, 0, 0);
+
+      const pos = points.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i);
+        pos.setY(i, y + Math.sin(t + i*0.1) * 0.0008);
+      }
+      pos.needsUpdate = true;
+
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
